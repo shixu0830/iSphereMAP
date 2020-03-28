@@ -254,8 +254,8 @@ save(rslt,file=
 #### make plot (after sufficient iteration of run_uneven_mod)
 old.all.save = adaptive.all.save = 0
 n.rep = 3
-for(count in 1:n.rep){
-  rslt <- run_uneven_mod(numberofgroups,seed,kappa)
+for(i in 1:n.rep){
+  rslt <- run_uneven_mod(numberofgroups,seed=i,kappa)
   old.all.save = old.all.save + rslt$old.all
   adaptive.all.save = adaptive.all.save + rslt$adaptive.all
 }
