@@ -104,7 +104,7 @@ norm(Yhat.spr-Y,"F")
 ##             Mapping              ##
 ######################################
 lambda.cv=0.6 ## this is what is used in the paper
-Pi = fitpi_CV(estPi="spherical",Ytrgt=Y,Yhat=Yhat.spr,lambda.cv=lambda.cv,n,grp.info,ugrp)
+Pi = fitpi_CV(estPi="OLS",Ytrgt=Y,Yhat=Yhat.spr,lambda.cv=lambda.cv,n,grp.info,ugrp)
 Pi= Pi/rowNorms(Pi)#%*%X)
 Pi.spike=apply(Pi,1,max)
 perm.true=which(grp.info$combination==0)
