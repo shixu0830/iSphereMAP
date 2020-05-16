@@ -9,19 +9,18 @@ rowNorms = function(M){
 ############################
 ######    Functions    #####
 ##### Run code start at ####
-#####     Line 252      ####
+#####     Line 236      ####
 ############################
 run_uneven_mod <- function(numberofgroups,seed,kappa){
   ############################
   # Fix sparsity, all dense shuffle, implement lambda based on groupsize 
   # Higher penalty for higher groupsize
   ############################
-  nlambda = 50
+  nlambda = 50	
   set.seed(seed)
-  # true coef W and group info are from real data (summstat_final.RData)
+  # true coef W and group info are from real data
   W.true <- BetaBALL
   grp.info.save <- grp.info
-  
   p = 300
   mykappa = kappa
   grp.select <- 1:numberofgroups
@@ -52,15 +51,12 @@ run_uneven_mod <- function(numberofgroups,seed,kappa){
   
   # specify true Pi: sparse shuffle within group 
   A <- diag(1,N,N)
-  # Perm = FALSE	
   d=4
   
   ########################################
   # start for loop     
   # Modify to different sparsity (%1-m mapping) for each group 
   # n is the number of groups
-  # extreme case: a group only have pure 1-1 or pure 1-m; equal group size
-  ##each group has (35*2)% mismatch; either pure 1-1 or pure 1-m according to pure.1to1
   sparsity =rep(0.35,numberofgroups)
   for(i in 1:n){
     ind <- which(grp.info$g.index==ugrp[i])
@@ -112,21 +108,13 @@ run_uneven_mod <- function(numberofgroups,seed,kappa){
   #################################################
   ####### Step 2: Estimate Pi
   #################################################
-  Pi <- fitpi_OLS(estPi="OLS",Ytrgt=Y,Yhat=Yhat.spr,n,grp.info,ugrp,ridge.lambda=1e-10)
   tmpweight<-NULL
+  grp.info=merge(grp.info,data.frame(table(grp.info$g.index)),by.x="g.index",by.y="Var1")
   for(group in 1:n){
-    tmpind <- which(grp.info$g.index==ugrp[group])
-    for(indgroup in tmpind){
-      if(max(Pi[indgroup,tmpind])<=0){
-        tmpres <- 0
-      }else{
-        tmpres <- sqrt(sum((Pi[indgroup,tmpind]/max(Pi[indgroup,tmpind])-1)^2))
-      }
-      tmpweight <- c(tmpweight,tmpres)
-    }
+    tmpind <- which(grp.info$g.index==ugrp[group])[1]
+    tmpweight <- c(tmpweight,log(grp.info$Freq[tmpind]))
   }
   tmpweight <- tmpweight/max(tmpweight)
-  
   rslt=ROC.lambda.mod(p,N,Y,Yhat.spr,nlambda,n,grp.info,ugrp,groupsparsity=tmpweight,A)
   return(rslt)
 }
@@ -140,7 +128,7 @@ ROC.lambda.mod = function(p,N,Y,Yhat.spr,nlambda,n,grp.info,ugrp,groupsparsity,A
   A.1to1 = which(apply(A,1,max)==1)
   A.1toM = which(apply(A,1,max)!=1)
   ## series of lambda
-  lambda.all=c(-1,seq(0,2,length.out=nlambda),3,4,5,6);count=0
+  lambda.all=c(-1,seq(0,2,length.out=nlambda));count=0
   adaptive.all=old.all=NULL
   for(lambda.cv in lambda.all){
     ### adaptive Pi
@@ -181,16 +169,12 @@ fitpi_CV_mod = function(estPi,Ytrgt,Yhat,lambda.cv,n,grp.info,ugrp,ridge.lambda=
       X.pi = t(Yhat[ind,])
       Y.pi = t(Ytrgt[ind,])
       Pi.ols = t( solve(t(X.pi)%*%X.pi+diag(ridge.lambda,ncol(X.pi)))%*%t(X.pi)%*%Y.pi  )
-      #### below do adaptive lasso (not group-adaptive lasso but code-adaptive lasso)
-      tmpweight.group.i = tmpweight[ind]
-      Pi.perm=NULL
-      for(j in 1:length(ind)){
-        x=Pi.ols[j,]
-        if((1-max(x/norm(x,type="2"))<(lambda.cv*tmpweight.group.i[j]))){
+      Pi.perm = t(apply(Pi.ols,1,FUN=function(x){
+        if((1-max(x/norm(x,type="2"))<(lambda.cv*tmpweight[i]))){
           x[which.max(x)]=1; x[-which.max(x)]=0
         }
-        Pi.perm=rbind(Pi.perm,x)
-      }
+        return(x)
+      }))
     }else{
       Pi.perm = 1
     }
@@ -218,23 +202,6 @@ fitpi_CV = function(estPi,Ytrgt,Yhat,lambda.cv,n,grp.info,ugrp,ridge.lambda=1e-1
       Pi.perm = 1
     }
     Pi.all = append(Pi.all,list(Pi.perm))
-  }
-  Pi = bdiag(Pi.all)
-  return(Pi)
-}
-
-fitpi_OLS = function(estPi,Ytrgt,Yhat,n,grp.info,ugrp,ridge.lambda=1e-10){
-  Pi.all = Pi.all2 = Pi.all3 = list()
-  for(i in 1:n){
-    ind = which(grp.info$g.index==ugrp[i])
-    if(length(ind)>1){
-      X.pi = t(Yhat[ind,])
-      Y.pi = t(Ytrgt[ind,])
-      Pi.ols = t( solve(t(X.pi)%*%X.pi+diag(ridge.lambda,ncol(X.pi)))%*%t(X.pi)%*%Y.pi  )
-    }else{
-      Pi.ols=1
-    }
-    Pi.all = append(Pi.all,list(Pi.ols))
   }
   Pi = bdiag(Pi.all)
   return(Pi)
@@ -276,8 +243,9 @@ load(paste0(my.filepath,"summstat_final.RData"))
 #### do one run
 rslt <- run_uneven_mod(numberofgroups,seed,kappa)
 save(rslt,file=
-       paste0(my.filepath,"FIG_G3_",
+       paste0(my.filepath,"FIG_G1_",
               paste0("groups",numberofgroups,"kappa",kappa,"mod","seed",seed),".RData"))
+
 
 #### make plot (after sufficient iteration of run_uneven_mod)
 old.all.save = adaptive.all.save = 0
@@ -301,4 +269,3 @@ legend("bottomleft",bty="n",cex=0.8,
        col=c("black","red"),
        legend=c("Equal threshold","Adaptive threshold")
 )
-
